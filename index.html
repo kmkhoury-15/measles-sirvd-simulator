@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Browser-based age-structured SEIR/SIRVD measles simulation with vaccination, seasonality, and age-specific contact mixing." />
+  <title>Age-Structured Measles SEIR/SIRVD Simulator</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero__content">
+      <p class="eyebrow">Public Health Modeling Web App</p>
+      <h1>Age-Structured Measles SEIR/SIRVD Simulator</h1>
+      <p class="hero__text">
+        Explore how age structure, contact patterns, vaccination, seasonality, and disease severity shape a measles outbreak.
+        This browser-only app ports the original Python ODE model to JavaScript for GitHub Pages deployment.
+      </p>
+      <div class="hero__actions">
+        <button id="runButton" class="button button--primary">Run simulation</button>
+        <button id="resetButton" class="button button--secondary">Reset defaults</button>
+        <button id="downloadButton" class="button button--secondary">Download CSV</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="controls" aria-label="Simulation controls">
+      <section class="panel">
+        <h2>Core settings</h2>
+        <label>
+          Total population
+          <input id="N_total" type="number" min="100" step="100" value="12000" />
+        </label>
+        <label>
+          Simulation duration
+          <input id="t_duration" type="number" min="1" step="1" value="120" />
+        </label>
+        <label>
+          Time unit
+          <select id="t_unit">
+            <option value="days" selected>days</option>
+            <option value="months">months</option>
+            <option value="years">years</option>
+          </select>
+        </label>
+        <label>
+          Target R₀
+          <input id="R0_target" type="number" min="1" max="30" step="0.1" value="12" />
+        </label>
+        <label>
+          Seasonal amplitude α
+          <input id="alpha_season" type="number" min="0" max="1" step="0.01" value="0.2" />
+        </label>
+      </section>
+
+      <section class="panel">
+        <h2>Disease parameters</h2>
+        <label>
+          Incubation period, days
+          <input id="incubation_days" type="number" min="1" max="30" step="1" value="12" />
+        </label>
+        <label>
+          Infectious period, days
+          <input id="infectious_days" type="number" min="1" max="30" step="1" value="9" />
+        </label>
+        <label>
+          Case fatality rate
+          <input id="CFR" type="number" min="0" max="0.5" step="0.001" value="0.02" />
+        </label>
+        <label>
+          Natural birth/death rate μ per year
+          <input id="mu" type="number" min="0" max="0.1" step="0.001" value="0.018" />
+        </label>
+      </section>
+
+      <section class="panel">
+        <h2>Seeding and vaccination</h2>
+        <label>
+          Initial infected count
+          <input id="I0_count" type="number" min="1" step="1" value="5" />
+        </label>
+        <label>
+          Seed age group
+          <select id="seed_age">
+            <option value="0" selected>0–4 yrs</option>
+            <option value="1">5–14 yrs</option>
+            <option value="2">15–44 yrs</option>
+            <option value="3">45+ yrs</option>
+          </select>
+        </label>
+        <label>
+          Dose 1 efficacy
+          <input id="efficacy1" type="number" min="0" max="1" step="0.01" value="0.93" />
+        </label>
+        <label>
+          Dose 2 efficacy
+          <input id="efficacy2" type="number" min="0" max="1" step="0.01" value="0.97" />
+        </label>
+      </section>
+
+      <section class="panel panel--wide">
+        <h2>Advanced age-specific inputs</h2>
+        <p class="hint">Comma-separated values for the four age groups: 0–4, 5–14, 15–44, 45+.</p>
+        <label>
+          Age fractions
+          <input id="age_fracs" type="text" value="0.08, 0.15, 0.45, 0.32" />
+        </label>
+        <label>
+          Prior immune fractions
+          <input id="prior_immune_frac" type="text" value="0.05, 0.20, 0.40, 0.50" />
+        </label>
+        <label>
+          Dose 1 vaccination rates ν₁ per year
+          <input id="nu1" type="text" value="0.01, 0.01, 0.02, 0.01" />
+        </label>
+        <label>
+          Dose 2 vaccination rates ν₂ per year
+          <input id="nu2" type="text" value="0, 0.08, 0.01, 0.005" />
+        </label>
+      </section>
+    </aside>
+
+    <section class="workspace" aria-live="polite">
+      <div id="status" class="status">Ready to run.</div>
+      <section class="cards" aria-label="Simulation summary">
+        <article class="card"><span>Peak infected</span><strong id="peakInfected">—</strong></article>
+        <article class="card"><span>Peak timing</span><strong id="peakTime">—</strong></article>
+        <article class="card"><span>Total deaths</span><strong id="totalDeaths">—</strong></article>
+        <article class="card"><span>Final vaccinated</span><strong id="totalVaccinated">—</strong></article>
+        <article class="card"><span>R₀ check</span><strong id="r0Check">—</strong></article>
+        <article class="card"><span>Final living population</span><strong id="finalPopulation">—</strong></article>
+      </section>
+
+      <section class="charts">
+        <article class="chart-card"><canvas id="chartCompartments"></canvas></article>
+        <article class="chart-card"><canvas id="chartInfectiousAge"></canvas></article>
+        <article class="chart-card"><canvas id="chartVaccinationDeaths"></canvas></article>
+        <article class="chart-card"><canvas id="chartSusceptibleFraction"></canvas></article>
+        <article class="chart-card"><canvas id="chartRt"></canvas></article>
+        <article class="chart-card"><canvas id="chartBeta"></canvas></article>
+        <article class="chart-card chart-card--wide"><canvas id="chartIncidence"></canvas></article>
+      </section>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>
+      Built as a static GitHub Pages app. All simulation code runs locally in the browser; no data are uploaded to a server.
+    </p>
+  </footer>
+</body>
+</html>
